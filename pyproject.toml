@@ -1,0 +1,40 @@
+[project]
+name = "agrag"
+version = "0.1.0"
+description = "Agentic RAG Engine with LangGraph and DeepSeek"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "langgraph>=0.2.70",
+    "langchain-core>=0.3.40",
+    "openai>=1.65.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.8.0",
+    "chromadb>=0.6.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.34.0",
+    "rich>=13.9.0",
+    "httpx>=0.28.0",
+    "python-dotenv>=1.0.1",
+    "duckduckgo-search>=7.5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.25.0",
+]
+local-embeddings = [
+    "sentence-transformers>=3.4.0",
+]
+
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
