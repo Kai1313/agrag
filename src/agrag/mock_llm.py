@@ -27,12 +27,19 @@ class MockLLMEngine:
     @staticmethod
     def classify_info_need(query: str) -> bool:
         q_lower = query.lower().strip()
+        # Strip common prompt prefix wrappers if present
+        if "query to evaluate:" in q_lower:
+            q_lower = q_lower.split("query to evaluate:")[-1].strip()
+        elif "query:" in q_lower:
+            q_lower = q_lower.split("query:")[-1].strip()
+
         greetings = {"hi", "hello", "hey", "good morning", "good evening", "howdy"}
-        if q_lower in greetings or any(q_lower.startswith(g) for g in greetings):
+        if q_lower in greetings or any(q_lower.startswith(g) or g in q_lower for g in greetings):
             return False
         if "2+2" in q_lower or "capital of france" in q_lower:
             return False
         return True
+
 
     @staticmethod
     def route_sources(query: str) -> List[SourceType]:
