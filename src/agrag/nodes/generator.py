@@ -41,8 +41,18 @@ Answer:"""
 
     messages = [
         {"role": "system", "content": system_content},
-        {"role": "user", "content": user_content},
     ]
+
+    # Inject up to the last 5 conversation history turns for multi-turn dialogue continuity
+    if state.messages_history:
+        for turn in state.messages_history[-5:]:
+            role = turn.get("role", "user")
+            content = turn.get("content", "")
+            if role in ["user", "assistant"] and content:
+                messages.append({"role": role, "content": content})
+
+    messages.append({"role": "user", "content": user_content})
+
 
     response_text = await llm_client.chat_completion(
         messages=messages,

@@ -3,7 +3,7 @@
 import asyncio
 import json
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from agrag.llm_client import llm_client
 from agrag.state import AgentState, RetrievedChunk, SourceType
 from agrag.tools.custom_tools import tool_registry
@@ -12,9 +12,25 @@ from agrag.tools.vector_store import ChromaVectorRetriever
 
 logger = logging.getLogger(__name__)
 
-# Singletons for retrievers
-_vector_retriever = ChromaVectorRetriever()
-_web_retriever = WebSearchRetriever()
+# Lazy singleton holders
+_vector_retriever: Optional[ChromaVectorRetriever] = None
+_web_retriever: Optional[WebSearchRetriever] = None
+
+
+def get_vector_retriever() -> ChromaVectorRetriever:
+    """Lazily initialize and return the ChromaVectorRetriever singleton."""
+    global _vector_retriever
+    if _vector_retriever is None:
+        _vector_retriever = ChromaVectorRetriever()
+    return _vector_retriever
+
+
+def get_web_retriever() -> WebSearchRetriever:
+    """Lazily initialize and return the WebSearchRetriever singleton."""
+    global _web_retriever
+    if _web_retriever is None:
+        _web_retriever = WebSearchRetriever()
+    return _web_retriever
 
 SYSTEM_PROMPT = """You are a Source Selector Agent in an enterprise Agentic RAG pipeline.
 Your job is to route the query to the appropriate knowledge silos and specify tool parameters if needed.
@@ -78,11 +94,12 @@ async def source_router_node(state: AgentState) -> Dict[str, Any]:
 
     # 1. Vector DB retrieval
     if "vector_db" in selected_sources:
-        tasks.append(_vector_retriever.retrieve(query, top_k=3))
+        tasks.append(get_vector_retriever().retrieve(query, top_k=3))
 
     # 2. Web Search retrieval
     if "web_search" in selected_sources:
-        tasks.append(_web_retriever.retrieve(query, top_k=2))
+        tasks.append(get_web_retriever().retrieve(query, top_k=2))
+
 
     # 3. Tool API execution
     if "tool_api" in selected_sources:

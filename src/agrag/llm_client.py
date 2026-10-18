@@ -71,10 +71,22 @@ class LLMClient:
 
         # 1. Query Rewriter prompt simulation
         if "query rewriter" in system_prompt.lower():
-            rewritten = mock_llm.rewrite_query(last_user_message, [], [])
+            critiques = []
+            query_extracted = last_user_message
+            if "previous evaluation critique:" in last_user_message.lower():
+                parts = last_user_message.split("Original User Query:")
+                critique_part = parts[0].split("Previous Evaluation Critique:")[-1]
+                critique_cleaned = critique_part.strip()
+                if critique_cleaned and "none (initial attempt)" not in critique_cleaned.lower():
+                    critiques.append(critique_cleaned)
+                if len(parts) > 1:
+                    query_extracted = parts[1].split("Rewrite the query now:")[0].strip()
+
+            rewritten = mock_llm.rewrite_query(query_extracted, [], critiques)
             if response_format and response_format.get("type") == "json_object":
                 return json.dumps({"updated_query": rewritten})
             return rewritten
+
 
         # 2. Info Need Classifier prompt simulation
         if "retrieval need" in system_prompt.lower() or "classifier" in system_prompt.lower():
