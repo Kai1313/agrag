@@ -107,3 +107,36 @@ class TestPhase3GraphFlow:
         assert len(state_turn2.messages_history) == 4
         assert "Alex" in state_turn2.messages_history[0]["content"]
         assert state_turn2.status == "completed"
+
+    @pytest.mark.asyncio
+    async def test_stream_agrag_pipeline_events(self):
+        """Path 6: Verify stream_agrag_pipeline emits expected lifecycle events."""
+        from agrag.graph import stream_agrag_pipeline
+
+        events = []
+        async for event in stream_agrag_pipeline(
+            user_query="What is Acme's MFA policy?",
+            thread_id="test-stream-thread",
+        ):
+            events.append(event)
+
+        assert len(events) > 0
+        event_types = [e["event"] for e in events]
+        nodes = [e["node"] for e in events]
+
+        # Verify key milestone events are present
+        assert "node_complete" in event_types
+        assert "routing_decision" in event_types or "info_classifier" in nodes
+        assert "final_response" in event_types
+        assert "final_success" in nodes or "graceful_fallback" in nodes
+
+    def test_top_level_package_exports(self):
+        """Verify top-level clean exports from agrag."""
+        import agrag
+
+        assert hasattr(agrag, "run_agrag_pipeline")
+        assert hasattr(agrag, "stream_agrag_pipeline")
+        assert hasattr(agrag, "build_agrag_graph")
+        assert hasattr(agrag, "agrag_app")
+        assert hasattr(agrag, "AgentState")
+

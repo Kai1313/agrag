@@ -1,7 +1,7 @@
 """LangGraph Cyclic State Machine Assembly & Execution Control."""
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, AsyncGenerator, Dict, Optional
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -17,24 +17,39 @@ from agrag.state import AgentState
 logger = logging.getLogger(__name__)
 
 
+__all__ = [
+    "build_agrag_graph",
+    "agrag_app",
+    "run_agrag_pipeline",
+    "stream_agrag_pipeline",
+]
+
+
 # ---------------------------------------------------------------------------
 # Terminal Completion & Fallback Nodes
 # ---------------------------------------------------------------------------
 
 
+def _finalize_turn_state(
+    state: AgentState, response_text: str, status: str
+) -> Dict[str, Any]:
+    """Helper to append user and assistant messages to history and set final status."""
+    updated_history = list(state.messages_history)
+    updated_history.append({"role": "user", "content": state.user_query})
+    updated_history.append({"role": "assistant", "content": response_text})
+    return {
+        "final_response": response_text,
+        "status": status,
+        "messages_history": updated_history,
+    }
+
+
 async def final_success_node(state: AgentState) -> Dict[str, Any]:
     """Terminal node for verified, grounded responses."""
     logger.info("Graph: Final Success reached.")
-    updated_history = list(state.messages_history)
-    updated_history.append({"role": "user", "content": state.user_query})
-    updated_history.append(
-        {"role": "assistant", "content": state.initial_response or ""}
+    return _finalize_turn_state(
+        state, state.initial_response or "", status="completed"
     )
-    return {
-        "final_response": state.initial_response,
-        "status": "completed",
-        "messages_history": updated_history,
-    }
 
 
 async def graceful_fallback_node(state: AgentState) -> Dict[str, Any]:
@@ -51,14 +66,7 @@ async def graceful_fallback_node(state: AgentState) -> Dict[str, Any]:
         f"**Notice**: {critique}\n\n"
         f"If you believe this information should exist, please contact the IT Helpdesk or check Jira/ServiceNow tickets."
     )
-    updated_history = list(state.messages_history)
-    updated_history.append({"role": "user", "content": state.user_query})
-    updated_history.append({"role": "assistant", "content": fallback_message})
-    return {
-        "final_response": fallback_message,
-        "status": "fallback",
-        "messages_history": updated_history,
-    }
+    return _finalize_turn_state(state, fallback_message, status="fallback")
 
 
 async def capped_fallback_node(state: AgentState) -> Dict[str, Any]:
@@ -75,14 +83,8 @@ async def capped_fallback_node(state: AgentState) -> Dict[str, Any]:
         f"{state.initial_response or ''}\n\n"
         f"*(Validation Note: {critique})*"
     )
-    updated_history = list(state.messages_history)
-    updated_history.append({"role": "user", "content": state.user_query})
-    updated_history.append({"role": "assistant", "content": warning_message})
-    return {
-        "final_response": warning_message,
-        "status": "fallback",
-        "messages_history": updated_history,
-    }
+    return _finalize_turn_state(state, warning_message, status="fallback")
+
 
 
 # ---------------------------------------------------------------------------
@@ -217,3 +219,47 @@ async def run_agrag_pipeline(
     if isinstance(result, AgentState):
         return result
     return AgentState(**result)
+
+
+async def stream_agrag_pipeline(
+    user_query: str,
+    thread_id: str = "default-thread",
+    model_name: str = "deepseek-chat",
+    max_retries: int = 2,
+    graph: Optional[CompiledStateGraph] = None,
+) -> AsyncGenerator[Dict[str, Any], None]:
+    """Yields lifecycle events as the AGRAG state machine executes node-by-node."""
+    engine = graph or agrag_app
+    initial_state = {
+        "user_query": user_query,
+        "thread_id": thread_id,
+        "model_name": model_name,
+        "max_retries": max_retries,
+    }
+    config = {"configurable": {"thread_id": thread_id}}
+
+    async for update_chunk in engine.astream(
+        initial_state, config=config, stream_mode="updates"
+    ):
+        for node_name, node_output in update_chunk.items():
+            if node_name == "info_classifier":
+                event_type = "routing_decision"
+            elif node_name == "source_router":
+                event_type = "retrieval_complete"
+            elif node_name == "evaluator":
+                event_type = "evaluation_verdict"
+            elif node_name in [
+                "final_success",
+                "graceful_fallback",
+                "capped_fallback",
+            ]:
+                event_type = "final_response"
+            else:
+                event_type = "node_complete"
+
+            yield {
+                "event": event_type,
+                "node": node_name,
+                "data": node_output,
+            }
+

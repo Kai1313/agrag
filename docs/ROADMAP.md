@@ -57,14 +57,15 @@ To ensure 100% architectural fidelity and zero regressions, the implementation i
     - `failure_type in ["hallucination", "unrelated"]` and `retry_count < max_retries` $\rightarrow$ Loop back to `rewriter`.
     - `retry_count >= max_retries` $\rightarrow$ Max-retries capped fallback.
 - [x] Integrate session memory checkpointer (`MemorySaver` / SQLite) with `thread_id`.
-- [x] **Verification Gate 3:** `tests/test_phase3_graph.py` passed 100% of assertions (5/5 paths, 17/17 cumulative tests).
-
+- [x] Implement `stream_agrag_pipeline()` lifecycle generator for FastAPI SSE streaming and CLI terminal events.
+- [x] Export clean public API at package root (`agrag/__init__.py`).
+- [x] **Verification Gate 3:** `tests/test_phase3_graph.py` passed 100% of assertions (7/7 tests, 19/19 cumulative tests).
 
 ---
 
 ### [ ] Phase 4: Serving & Streaming UX
+- [ ] Implement `src/agrag/server/sse.py` (FastAPI SSE event streamer serializing `stream_agrag_pipeline` events).
 - [ ] Implement `src/agrag/server/app.py` (FastAPI REST service with health & chat endpoints).
-- [ ] Implement `src/agrag/server/sse.py` (Event generator streaming node starts, routing choices, tool updates, tokens, and final answer).
 - [ ] Implement `cli/main.py` (Rich-based interactive terminal client with live spinners, step trees, and token streaming).
 - [ ] Provide `.env.example` and end-to-end integration tests.
 - [ ] **Verification Gate 4:** `tests/test_phase4_e2e.py` validating the FastAPI SSE stream and CLI execution.
@@ -105,8 +106,8 @@ To ensure 100% architectural fidelity and zero regressions, the implementation i
   - All 6 micro-agent nodes implemented cleanly in `src/agrag/nodes/`.
   - Zero regressions across foundational Phase 1 tests (12/12 total tests passing).
 
-### Phase 3 Audit Checkpoint — [PASSED 5/5 (17/17 Cumulative)]
-- **Date & Timestamp:** 2026-10-18T04:40:00Z
+### Phase 3 Audit Checkpoint — [PASSED 7/7 (19/19 Cumulative)]
+- **Date & Timestamp:** 2026-10-18T05:50:00Z
 - **Test Suite:** `tests/test_phase3_graph.py` & `tests/`
 - **Results:**
   - `test_path1_direct_conversational_no_retrieval`: PASSED (bypasses retrieval on greetings, completes directly)
@@ -114,9 +115,13 @@ To ensure 100% architectural fidelity and zero regressions, the implementation i
   - `test_path3_missing_info_fast_abort`: PASSED (detects unanswerable query, fast-aborts to graceful fallback with 0 retry loops)
   - `test_path4_hallucination_retry_loop`: PASSED (corrective cycle: triggers rewrite loop with critique, tracks retry count $\le 2$)
   - `test_path5_multi_turn_conversational_memory`: PASSED (MemorySaver checkpointer persists multi-turn dialogue across turns via thread_id)
+  - `test_stream_agrag_pipeline_events`: PASSED (stream_agrag_pipeline accurately yields lifecycle events for nodes, router, evaluator, and final response)
+  - `test_top_level_package_exports`: PASSED (clean top-level exports from `agrag` root module)
 - **Artifacts Verified:**
-  - `src/agrag/graph.py`: StateGraph compilation, conditional routing edges, terminal fallback/success nodes, and `run_agrag_pipeline` runner.
-  - 100% of canonical state machine execution paths tested and verified.
+  - `src/agrag/graph.py`: StateGraph compilation, conditional routing edges, terminal fallback/success nodes, `run_agrag_pipeline` runner, and `stream_agrag_pipeline` generator.
+  - `src/agrag/__init__.py`: Clean public API exports.
+  - 100% of canonical state machine execution paths, streaming events, and exports tested and verified.
+
 
 
 
